@@ -35,10 +35,9 @@ body{
     margin-bottom:20px;
 }
 
-/* Tombol Dengarkan */
 .listen-btn{
-    padding:12px 25px;
-    font-size:18px;
+    padding:10px 20px;
+    font-size:16px;
     border:none;
     border-radius:30px;
     background:#00ffcc;
@@ -51,11 +50,18 @@ body{
     transform:scale(1.05);
 }
 
+.controls{
+    display:none;
+    gap:10px;
+    margin-top:10px;
+}
+
 .status{
-    font-size:22px;
+    font-size:20px;
     font-weight:bold;
     margin:15px 0;
     animation: blink 1.5s infinite;
+    display:none;
 }
 
 @keyframes blink{
@@ -96,14 +102,20 @@ body{
 <body>
 
 <div class="overlay">
+
     <img src="sbfm.png" class="logo">
 
     <button class="listen-btn" id="listenBtn">
         🎧 Dengarkan Sekarang
     </button>
 
-    <div class="status" id="status" style="display:none;">
+    <div class="status" id="status">
         🔴 Sedang Siaran Langsung
+    </div>
+
+    <div class="controls" id="controls">
+        <button class="listen-btn" onclick="playRadio()">▶ Play</button>
+        <button class="listen-btn" onclick="stopRadio()">⏹ Stop</button>
     </div>
 
     <div class="equalizer" id="equalizer"></div>
@@ -111,6 +123,7 @@ body{
     <div class="volume" id="volumeBox">
         <div class="volume-fill" id="volumeFill"></div>
     </div>
+
 </div>
 
 <audio id="radioPlayer"></audio>
@@ -120,17 +133,25 @@ const streamURL = "https://streaming.sinjaikab.go.id:8443/sbfm";
 const audio = document.getElementById("radioPlayer");
 
 let audioCtx, analyser, source, dataArray;
+let isStarted = false;
 
+// Klik Dengarkan
 document.getElementById("listenBtn").addEventListener("click", () => {
+
     startRadio();
 
     document.getElementById("listenBtn").style.display="none";
     document.getElementById("status").style.display="block";
     document.getElementById("equalizer").style.display="flex";
     document.getElementById("volumeBox").style.display="block";
+    document.getElementById("controls").style.display="flex";
 });
 
+// Mulai Streaming
 function startRadio(){
+    if(isStarted) return;
+    isStarted = true;
+
     audio.src = streamURL + "?t=" + new Date().getTime();
     audio.crossOrigin = "anonymous";
     audio.load();
@@ -138,20 +159,32 @@ function startRadio(){
     initAudio();
 }
 
+// Play Manual
+function playRadio(){
+    audio.play();
+}
+
+// Stop Manual
+function stopRadio(){
+    audio.pause();
+}
+
 // Auto reconnect
 audio.addEventListener("error", () => {
-    setTimeout(startRadio, 3000);
-});
-audio.addEventListener("ended", () => {
-    setTimeout(startRadio, 3000);
+    setTimeout(()=> {
+        audio.src = streamURL + "?t=" + new Date().getTime();
+        audio.play();
+    }, 3000);
 });
 
+// Setup Visualizer
 function initAudio(){
     if(audioCtx) return;
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioCtx.createAnalyser();
     source = audioCtx.createMediaElementSource(audio);
+
     source.connect(analyser);
     analyser.connect(audioCtx.destination);
 
