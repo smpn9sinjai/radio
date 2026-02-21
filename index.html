@@ -7,6 +7,7 @@
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+
 body{
     height:100vh;
     display:flex;
@@ -14,88 +15,107 @@ body{
     align-items:center;
     font-family:Arial, sans-serif;
     background:url('background.jpg') no-repeat center center/cover;
-    overflow:hidden;
 }
 
 .overlay{
     position:absolute;
     width:100%;
     height:100%;
-    background:rgba(0,0,0,0.75);
+    background:rgba(0,0,0,0.85);
     display:flex;
     flex-direction:column;
     justify-content:center;
     align-items:center;
-    text-align:center;
     color:white;
 }
 
-.logo{
-    width:200px;
-    margin-bottom:20px;
+.logo-wrapper{
+    position:relative;
+    width:260px;
+    height:260px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
 }
 
-.listen-btn{
-    padding:10px 20px;
-    font-size:16px;
+.logo{
+    width:170px;
+    border-radius:50%;
+    z-index:2;
+}
+
+canvas{
+    position:absolute;
+    width:100%;
+    height:100%;
+}
+
+/* Tombol di tengah logo */
+.play-btn{
+    position:absolute;
+    top:170px;
+    width:40px;
+    height:40px;
+    border-radius:50%;
     border:none;
-    border-radius:30px;
-    background:#00ffcc;
-    color:#000;
+    background:orange;
+    color:black;
+    font-size:18px;
     cursor:pointer;
+    z-index:3;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     transition:0.3s;
 }
-.listen-btn:hover{
-    background:#00ccaa;
-    transform:scale(1.05);
+
+.play-btn:hover{
+    background:#ff9900;
 }
 
-.controls{
-    display:none;
-    gap:10px;
-    margin-top:10px;
-}
-
+/* Status */
 .status{
-    font-size:20px;
-    font-weight:bold;
-    margin:15px 0;
-    animation: blink 1.5s infinite;
-    display:none;
-}
-
-@keyframes blink{
-    0%{opacity:1;}
-    50%{opacity:0.5;}
-    100%{opacity:1;}
-}
-
-.equalizer{
-    display:none;
-    gap:4px;
-    margin-top:20px;
-    height:50px;
-}
-.bar{
-    width:6px;
-    background:#00ffcc;
-    height:10px;
-    border-radius:3px;
-}
-
-.volume{
-    display:none;
     margin-top:15px;
-    width:200px;
-    height:8px;
-    background:#444;
-    border-radius:10px;
-    overflow:hidden;
+    font-weight:bold;
+    display:none;
 }
-.volume-fill{
-    height:100%;
-    width:0%;
-    background:#00ffcc;
+
+.volume-control{
+    margin-top:15px;
+    display:none;
+    align-items:center;
+    gap:10px;
+}
+
+/* Hilangkan style default */
+.volume-control input{
+    -webkit-appearance:none;
+    width:160px;
+    height:6px;
+    border-radius:5px;
+    outline:none;
+    background:linear-gradient(to right, #ffb347, #ff8c00);
+    cursor:pointer;
+}
+
+/* Thumb (bulatan yang digeser) */
+.volume-control input::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    background:#ffffff;
+    border:3px solid #ff8c00;
+    cursor:pointer;
+}
+
+.volume-control input::-moz-range-thumb{
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    background:#ffffff;
+    border:3px solid #ff8c00;
+    cursor:pointer;
 }
 </style>
 </head>
@@ -103,124 +123,220 @@ body{
 
 <div class="overlay">
 
-    <img src="sbfm.png" class="logo">
-
-    <button class="listen-btn" id="listenBtn">
-        🎧 Dengarkan Sekarang
-    </button>
-
-    <div class="status" id="status">
-        🔴 Sedang Siaran Langsung
+    <div class="logo-wrapper">
+        <canvas id="visualizer"></canvas>
+        <img src="sbfm.png" class="logo">
+        <button class="play-btn" id="toggleBtn">▶</button>
     </div>
 
-    <div class="controls" id="controls">
-        <button class="listen-btn" onclick="playRadio()">▶ Play</button>
-        <button class="listen-btn" onclick="stopRadio()">⏹ Stop</button>
-    </div>
+    <div class="status" id="status">🔴 Sedang Siaran Langsung</div>
 
-    <div class="equalizer" id="equalizer"></div>
-
-    <div class="volume" id="volumeBox">
-        <div class="volume-fill" id="volumeFill"></div>
+    <div class="volume-control">
+        🔊
+        <input type="range" id="volumeSlider" min="0" max="100" value="100">
     </div>
 
 </div>
 
 <audio id="radioPlayer"></audio>
-
 <script>
-const streamURL = "https://streaming.sinjaikab.go.id:8443/sbfm";
-const audio = document.getElementById("radioPlayer");
+const streamURL="https://streaming.sinjaikab.go.id:8443/sbfm" 
+const audio=document.getElementById("radioPlayer");
+const toggleBtn=document.getElementById("toggleBtn");
+const volumeSlider=document.getElementById("volumeSlider");
+const canvas=document.getElementById("visualizer");
+const ctx=canvas.getContext("2d");
 
 let audioCtx, analyser, source, dataArray;
-let isStarted = false;
+let visualizerAnimationId;
+let loadingAnimationId;
+let started=false;
+let loadingAngle=0;
 
-// Klik Dengarkan
-document.getElementById("listenBtn").addEventListener("click", () => {
+audio.volume=1;
 
-    startRadio();
+/* Resize canvas */
+function resizeCanvas(){
+    canvas.width=canvas.offsetWidth;
+    canvas.height=canvas.offsetHeight;
+}
+resizeCanvas();
+window.addEventListener("resize",resizeCanvas);
 
-    document.getElementById("listenBtn").style.display="none";
-    document.getElementById("status").style.display="block";
-    document.getElementById("equalizer").style.display="flex";
-    document.getElementById("volumeBox").style.display="block";
-    document.getElementById("controls").style.display="flex";
+/* Volume */
+volumeSlider.addEventListener("input",()=>{
+    audio.volume=volumeSlider.value/100;
 });
 
-// Mulai Streaming
-function startRadio(){
-    if(isStarted) return;
-    isStarted = true;
+/* PLAY BUTTON */
+toggleBtn.addEventListener("click",()=>{
 
-    audio.src = streamURL + "?t=" + new Date().getTime();
-    audio.crossOrigin = "anonymous";
-    audio.load();
-    audio.play();
-    initAudio();
-}
-
-// Play Manual
-function playRadio(){
-    audio.play();
-}
-
-// Stop Manual
-function stopRadio(){
-    audio.pause();
-}
-
-// Auto reconnect
-audio.addEventListener("error", () => {
-    setTimeout(()=> {
-        audio.src = streamURL + "?t=" + new Date().getTime();
+    if(!started){
+        audio.src=streamURL+"?t="+Date.now();
+        audio.crossOrigin="anonymous";
         audio.play();
-    }, 3000);
+        started=true;
+        startLoading();
+    }else{
+        if(audio.paused){
+            audio.play();
+            startLoading();
+        }else{
+            audio.pause();
+        }
+    }
+
 });
 
-// Setup Visualizer
-function initAudio(){
-    if(audioCtx) return;
+/* ERROR */
+audio.addEventListener("error",()=>{
+    started=false;
+    toggleBtn.textContent="▶";
+    stopAllAnimation();
+	 startLoading();
+});
 
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    source = audioCtx.createMediaElementSource(audio);
+/* PLAYING */
+audio.addEventListener("playing",()=>{
 
-    source.connect(analyser);
-    analyser.connect(audioCtx.destination);
+    stopLoading();
 
-    analyser.fftSize = 64;
-    const bufferLength = analyser.frequencyBinCount;
-    dataArray = new Uint8Array(bufferLength);
+    toggleBtn.textContent="⏹";
+    document.getElementById("status").style.display="block";
+    document.querySelector(".volume-control").style.display="flex";
 
-    createBars(bufferLength);
-    animate();
+    initAudio();
+});
+
+/* PAUSE */
+audio.addEventListener("pause",()=>{
+    toggleBtn.textContent="▶";
+    document.getElementById("status").style.display="none";
+    document.querySelector(".volume-control").style.display="none";
+
+    stopAllAnimation();
+});
+
+/* ========================= */
+/* LOADING */
+/* ========================= */
+
+function startLoading(){
+    stopVisualizer();
+    drawLoading();
 }
 
-function createBars(count){
-    const eq = document.getElementById("equalizer");
-    for(let i=0;i<count;i++){
-        const bar = document.createElement("div");
-        bar.classList.add("bar");
-        eq.appendChild(bar);
+function drawLoading(){
+    loadingAnimationId=requestAnimationFrame(drawLoading);
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const centerX=canvas.width/2;
+    const centerY=canvas.height/2;
+    const radius=95;
+
+    loadingAngle+=0.08;
+
+    ctx.beginPath();
+    ctx.arc(centerX,centerY,radius,loadingAngle,loadingAngle+Math.PI*1.5);
+    ctx.strokeStyle="orange";
+    ctx.lineWidth=4;
+    ctx.stroke();
+}
+
+function stopLoading(){
+    cancelAnimationFrame(loadingAnimationId);
+}
+
+/* ========================= */
+/* AUDIO ANALYSER */
+/* ========================= */
+
+function initAudio(){
+
+    if(!audioCtx){
+        audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        analyser=audioCtx.createAnalyser();
+        source=audioCtx.createMediaElementSource(audio);
+
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        analyser.fftSize=128;
+        dataArray=new Uint8Array(analyser.frequencyBinCount);
+    }
+
+    if(audioCtx.state==="suspended"){
+        audioCtx.resume();
+    }
+
+    drawVisualizer();
+}
+
+/* ========================= */
+/* EQUALIZER */
+/* ========================= */
+
+function drawVisualizer(){
+ 
+    visualizerAnimationId=requestAnimationFrame(drawVisualizer);
+
+    analyser.getByteFrequencyData(dataArray);
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const centerX=canvas.width/2;
+    const centerY=canvas.height/2;
+    const radius=85;
+    const bars=dataArray.length;
+    const step=(Math.PI*2)/bars;
+
+    for(let i=0;i<bars;i++){
+
+        const value=dataArray[i];
+        const barHeight=value/3;
+        const angle=i*step;
+
+        const x1=centerX+Math.cos(angle)*radius;
+        const y1=centerY+Math.sin(angle)*radius;
+
+        const x2=centerX+Math.cos(angle)*(radius+barHeight);
+        const y2=centerY+Math.sin(angle)*(radius+barHeight);
+
+        ctx.strokeStyle=`hsl(${i*3},100%,50%)`;
+        ctx.lineWidth=3;
+
+        ctx.beginPath();
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+        ctx.stroke();
     }
 }
 
-function animate(){
-    requestAnimationFrame(animate);
-    analyser.getByteFrequencyData(dataArray);
-
-    const bars = document.querySelectorAll(".bar");
-    let total = 0;
-
-    bars.forEach((bar,i)=>{
-        const value = dataArray[i];
-        bar.style.height = (value/2) + "px";
-        total += value;
-    });
-
-    const avg = total / dataArray.length;
-    document.getElementById("volumeFill").style.width = (avg/2) + "%";
+function stopVisualizer(){
+    cancelAnimationFrame(visualizerAnimationId);
 }
+
+function stopAllAnimation(){
+    cancelAnimationFrame(loadingAnimationId);
+    cancelAnimationFrame(visualizerAnimationId);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+ audio.addEventListener("stalled", () => {
+   stopAllAnimation()
+   startLoading();
+});
+
+audio.addEventListener("abort", () => {
+     stopAllAnimation()
+   startLoading();
+});
+
+audio.addEventListener("emptied", () => {
+    stopAllAnimation()
+   startLoading();
+});
 </script>
 
 </body>
