@@ -69,7 +69,7 @@ canvas{
     height:40px;
     border-radius:50%;
     border:none;
-    background:#372f2f;
+    background:#4b3e3e;
     color:white;
     font-size:18px;
     cursor:pointer;
@@ -182,7 +182,7 @@ volumeSlider.addEventListener("input",()=>{
 
 /* PLAY BUTTON */
 toggleBtn.addEventListener("click",()=>{
-
+   toggleBtn.style.display="none"
     if(!started){
         audio.src=streamURL+"?t="+Date.now();
         audio.crossOrigin="anonymous";
@@ -193,9 +193,11 @@ toggleBtn.addEventListener("click",()=>{
         if(audio.paused){
             audio.play();
             startLoading();
+			 toggleBtn.style.display="block"
         }else{
             audio.pause();
 			 started=false;
+			  toggleBtn.style.display="block"
         }
     }
 
@@ -207,6 +209,7 @@ audio.addEventListener("error",()=>{
     toggleBtn.textContent="▶";
     stopAllAnimation();
 	 startLoading();
+	  toggleBtn.style.display="block"
 });
 
 /* PLAYING */
@@ -291,7 +294,7 @@ function initAudio(){
 /* ========================= */
 
 function drawVisualizer(){
- 
+      toggleBtn.style.display="block"
     visualizerAnimationId=requestAnimationFrame(drawVisualizer);
 
     analyser.getByteFrequencyData(dataArray);
