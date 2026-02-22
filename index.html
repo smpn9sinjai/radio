@@ -210,6 +210,7 @@ audio.addEventListener("error",()=>{
     stopAllAnimation();
 	 startLoading();
 	  toggleBtn.style.display="block"
+	  ceknet();
 });
 
 /* PLAYING */
@@ -295,6 +296,7 @@ function initAudio(){
 
 function drawVisualizer(){
       toggleBtn.style.display="block"
+	 document.getElementById("status").innerText="🔴 Sedang Siaran Langsung"
     visualizerAnimationId=requestAnimationFrame(drawVisualizer);
 
     analyser.getByteFrequencyData(dataArray);
@@ -342,6 +344,7 @@ function stopAllAnimation(){
  audio.addEventListener("stalled", () => {
    stopAllAnimation()
    startLoading();
+   ceknet();
 });
 
 audio.addEventListener("abort", () => {
@@ -353,6 +356,18 @@ audio.addEventListener("emptied", () => {
     stopAllAnimation()
    startLoading();
 });
+
+
+async function ceknet(){
+    try {
+        await fetch("https://www.google.com", { mode: "no-cors" });
+        document.getElementById("status").style.display="block";
+        document.getElementById("status").innerText="⚫ Belum Siaran atau Off Air";
+    } catch (error) {
+        document.getElementById("status").style.display="block";
+        document.getElementById("status").innerText="📡❌ Tidak ada jaringan internet";
+    }
+}
 </script>
 
 </body>
